@@ -6,6 +6,8 @@ import torch
 import torch.backends.cudnn as cudnn
 sys.path.append("./yolov5")
 
+import pyrealsense2 as rs
+
 from ui.style import *
 from ui.ui import *
 
@@ -13,7 +15,7 @@ from qt_material import apply_stylesheet
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
 from yolov5.utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+                                  increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, time_sync
 from yolov5.utils.augmentations import letterbox
@@ -27,8 +29,10 @@ theme = './ui/my_theme'
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
-        self.im0 = None
         self.imc = None
+        self.im0 = None
+        self.imd = None
+        self.imd0 = None
         self.centers = []
         self.timer_video = QTimer()
         self.yamlFileType = None
@@ -39,8 +43,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.yamlFileName = self.lastYamlFile
         self.started = False
         self.setupUi(self)
-        # self.ui = Ui_MainWindow()
-        # self.setupUi(self)
+        self.pipeline = rs.pipeline()
+        self.config = rs.config()
         self.parse = {
             "source": "--source 1",
             "imgsz": "--imgsz 1280",
@@ -55,11 +59,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.init_slots()
         self.save_fig()
         self.ViewSize = self.CV.geometry().getRect()[2:]
-        self.cap = cv2.VideoCapture()
+        # self.cap = cv2.VideoCapture()
         self.device = select_device("")
         self.half = False
-
+        self.pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
+        self.pipeline_profile = self.config.resolve(self.pipeline_wrapper)
+        self.videoDevice = self.pipeline_profile.get_device()
+        self.device_product_line = str(self.videoDevice.get_info(rs.camera_info.product_line))
         cudnn.benchmark = True
+
+
+
+
 
     def init_slots(self):
         self.timer_video.timeout.connect(self.show_frame)
@@ -85,23 +96,31 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if self.buttonCamera.isChecked():
                 # source = self.parse["source"].split(" ")[-1]
                 source = eval(self.opt["source"]) if self.opt["source"].isnumeric() else self.opt["source"]
-                flag = self.cap.open(source, cv2.CAP_DSHOW)
-                if flag == False:
+                self.found_rgb = False
+                for s in self.videoDevice.sensors:
+                    if s.get_info(rs.camera_info.name) == "RGB Camera":
+                        self.found_rgb = True
+                        break
+                if not self.found_rgb:
                     QMessageBox.warning(
                         self, u"Warning", u"打开摄像头失败", buttons=QMessageBox.Ok,
                         defaultButton=QMessageBox.Ok)
+                    print("The demo requires Depth camera with color sensor")
                 else:
+                    self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+                    self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+                    self.pipeline.start(self.config)
                     # self.cap.release()/ self.ViewSize[1] > 16 / 9
                     # self.ViewSize = self.CV.geometry().getRect()[2:]
                     # print("ViewSize:", self.ViewSize)
                     # h_min = min(self.ViewSize[0] / 16 * 9, self.ViewSize[1])
                     # self.ViewSize = [int(h_min / 9 * 16), int(h_min)]
                     # print("Resize:", self.ViewSize)
-                    self.timer_video.start(30)
+                    self.timer_video.start(1)
 
             if not self.buttonCamera.isChecked() and \
-                not self.buttonCapture.isChecked() and \
-                not self.buttonProcess.isChecked():
+                    not self.buttonCapture.isChecked() and \
+                    not self.buttonProcess.isChecked():
                 self.started = False
                 print("Loading Model With Opts...")
                 self.model = DetectMultiBackend(weights=self.opt["weights"],
@@ -109,16 +128,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                                                 dnn=False,
                                                 data=self.opt["data"] )
                 self.stride, \
-                self.names,\
-                self.pt,\
-                self.jot,\
-                self.onnx,\
+                self.names, \
+                self.pt, \
+                self.jot, \
+                self.onnx, \
                 self.engine = \
                     self.model.stride, \
                     self.model.names, \
                     self.model.pt, \
                     self.model.jit, \
-                    self.model.onnx,\
+                    self.model.onnx, \
                     self.model.engine
 
                 print("Image Size:", self.opt["imgsz"], type(self.opt["imgsz"]))
@@ -156,17 +175,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return img, pred
 
     def show_frame(self):
-        flag, img = self.cap.read()
-        if self.filter.isChecked():
-            img = cv2.filter2D(img, -1, kernel_outline)
+        frame = self.pipeline.wait_for_frames()
+        depth_image = np.asanyarray(frame.get_depth_frame().get_data())
+        self.imd0 = copy.deepcopy(depth_image)
+        img = np.asanyarray(frame.get_color_frame().get_data())
+        depth_color = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.2), cv2.COLORMAP_JET)
         if img is not None:
             # 记录原尺寸
             imageSourceShape = img.shape
             # 保留原图形备份
+            self.imd = depth_color
             self.imc = copy.deepcopy(img)
             self.im0 = copy.deepcopy(img)
             img, pred = self.predict(img)
             annotator = Annotator(self.imc, line_width=3, example=str(self.names))
+            annotator2 = Annotator(self.imd, line_width=3, example=str(self.names))
             for i, det in enumerate(pred):
                 if len(det):
                     det[:, :4] = scale_coords(img.shape[2:], det[:, :4], imageSourceShape).round()
@@ -175,14 +198,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     for *xyxy, conf, cls in reversed(det):
                         cx = int((xyxy[0] + xyxy[2]) / 2)
                         cy = int((xyxy[1] + xyxy[3]) / 2)
+                        # d1 = np.mean(depth_image[xyxy[0], xyxy[1]:xyxy[3]])
+                        # d2 = np.mean(depth_image[xyxy[2], xyxy[1]:xyxy[3]])
+                        # d3 = np.mean(depth_image[xyxy[0]:xyxy[2], xyxy[1]])
+                        # d4 = np.mean(depth_image[xyxy[0]:xyxy[2], xyxy[3]])
+                        # distance = int((d1 + d2 + d3 + d4) / 4)
+                        distance = depth_image[cy, cx]
                         self.centers.append((cx, cy))
                         label = self.names[int(cls)] if self.opt["hide_conf"] else f"{self.names[int(cls)]} {conf:.2f}"
+
                         annotator.box_label(xyxy, label, color=colors(int(cls) + 3, True))
+                        annotator2.box_label(xyxy, str((cx, cy, distance)), color=colors(int(cls) + 3, True))
 
                     self.centers.sort()
 
-            self.result = self.imc
-            # print(self.centers)
+            self.result = np.hstack((self.imc, self.imd))
             showImage = QImage(self.result.data,
                                self.result.shape[1],
                                self.result.shape[0],
@@ -192,13 +222,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         else:
             self.timer_video.stop()
-            self.cap.release()
             self.CV.clear()
             self.stop()
 
     def stop(self):
         if self.started:
-            self.cap.release()
+            self.pipeline.stop()
             self.started = False
             self.timer_video.stop()
 
@@ -247,11 +276,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.capture_off()
         self.imc = copy.deepcopy(self.im0)
         img = self.imc
+        depth_color = cv2.applyColorMap(cv2.convertScaleAbs(self.imd0, alpha=0.2), cv2.COLORMAP_JET)
         if img is not None:
             # 记录原尺寸
             imageSourceShape = img.shape
             img, pred = self.predict(img)
             annotator = Annotator(self.imc, line_width=3, example=str(self.names))
+            annotator2 = Annotator(self.imd, line_width=3, example=str(self.names))
             for i, det in enumerate(pred):
                 if len(det):
                     det[:, :4] = scale_coords(img.shape[2:], det[:, :4], imageSourceShape).round()
@@ -260,11 +291,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     for *xyxy, conf, cls in reversed(det):
                         cx = int((xyxy[0] + xyxy[2]) / 2)
                         cy = int((xyxy[1] + xyxy[3]) / 2)
+                        # d1 = np.mean(depth_image[xyxy[0], xyxy[1]:xyxy[3]])
+                        # d2 = np.mean(depth_image[xyxy[2], xyxy[1]:xyxy[3]])
+                        # d3 = np.mean(depth_image[xyxy[0]:xyxy[2], xyxy[1]])
+                        # d4 = np.mean(depth_image[xyxy[0]:xyxy[2], xyxy[3]])
+                        # distance = int((d1 + d2 + d3 + d4) / 4)
+                        distance = self.imd0[cy, cx]
                         self.centers.append((cx, cy))
                         label = self.names[int(cls)] if self.opt["hide_conf"] else f"{self.names[int(cls)]} {conf:.2f}"
-                        annotator.box_label(xyxy, label, color=colors(int(cls) + 3, True))
 
-                    # Add By XiaMoo
+                        annotator.box_label(xyxy, label, color=colors(int(cls) + 3, True))
+                        annotator2.box_label(xyxy, str((cx, cy, distance)), color=colors(int(cls) + 3, True))
+
                     self.centers.sort()
                     for i in range(len(self.centers) - 1 if len(self.centers) > 0 else 0):
                         cv2.circle(self.imc, self.centers[i], 7, (255, 255, 255), -1)
@@ -272,13 +310,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     if len(self.centers):
                         cv2.circle(self.imc, self.centers[-1], 7, (255, 255, 255), -1)
 
-            self.result = self.imc
-            print(self.centers)
+            self.result = np.hstack((self.imc, self.imd))
             showImage = QImage(self.result.data,
                                self.result.shape[1],
                                self.result.shape[0],
                                QImage.Format_BGR888)
             self.CV.setPixmap(QPixmap.fromImage(showImage))
+
 
     def porcess_off(self):
         pass
