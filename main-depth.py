@@ -4,6 +4,7 @@ import copy
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
+
 sys.path.append("./yolov5")
 
 import pyrealsense2 as rs
@@ -15,13 +16,12 @@ from qt_material import apply_stylesheet
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
 from yolov5.utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
-                                  increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+                                  increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer,
+                                  xyxy2xywh)
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, time_sync
 from yolov5.utils.augmentations import letterbox
 from filter.filter import *
-
-
 
 theme = './ui/my_theme'
 
@@ -52,8 +52,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "data": "--data yolov5/data/blastHole.yaml",
             "filter": "--filter",
             "show_conf": "",
-            "conf" : "--conf-thres 0.25",
-            "iou" : "--iou-thres 0.45"
+            "conf": "--conf-thres 0.25",
+            "iou": "--iou-thres 0.45"
         }
         self.opt = {}
         self.init_slots()
@@ -67,10 +67,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.videoDevice = self.pipeline_profile.get_device()
         self.device_product_line = str(self.videoDevice.get_info(rs.camera_info.product_line))
         cudnn.benchmark = True
-
-
-
-
 
     def init_slots(self):
         self.timer_video.timeout.connect(self.show_frame)
@@ -95,7 +91,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.started = True
             if self.buttonCamera.isChecked():
                 # source = self.parse["source"].split(" ")[-1]
-                source = eval(self.opt["source"]) if self.opt["source"].isnumeric() else self.opt["source"]
+                # source = eval(self.opt["source"]) if self.opt["source"].isnumeric() else self.opt["source"]
                 self.found_rgb = False
                 for s in self.videoDevice.sensors:
                     if s.get_info(rs.camera_info.name) == "RGB Camera":
@@ -126,11 +122,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.model = DetectMultiBackend(weights=self.opt["weights"],
                                                 device=self.device,
                                                 dnn=False,
-                                                data=self.opt["data"] )
+                                                data=self.opt["data"])
                 self.stride, \
                 self.names, \
                 self.pt, \
-                self.jot, \
+                self.jit, \
                 self.onnx, \
                 self.engine = \
                     self.model.stride, \
@@ -141,7 +137,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.model.engine
 
                 print("Image Size:", self.opt["imgsz"], type(self.opt["imgsz"]))
-                self.imgsz = (check_img_size(self.opt["imgsz"], s=self.stride), ) * 2
+                self.imgsz = (check_img_size(self.opt["imgsz"], s=self.stride),) * 2
                 print("Image Size:", self.imgsz, type(self.imgsz))
                 self.half &= (self.pt or self.jit or self.onnx or self.engine) and self.device.type != 'cpu'
                 if self.pt or self.jit:
@@ -304,9 +300,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         annotator2.box_label(xyxy, str((cx, cy, distance)), color=colors(int(cls) + 3, True))
 
                     self.centers.sort()
-                    for i in range(len(self.centers) - 1 if len(self.centers) > 0 else 0):
-                        cv2.circle(self.imc, self.centers[i], 7, (255, 255, 255), -1)
-                        cv2.line(self.imc, self.centers[i], self.centers[i + 1], (255, 255, 0), 3)
+                    for j in range(len(self.centers) - 1 if len(self.centers) > 0 else 0):
+                        cv2.circle(self.imc, self.centers[j], 7, (255, 255, 255), -1)
+                        cv2.line(self.imc, self.centers[j], self.centers[j + 1], (255, 255, 0), 3)
                     if len(self.centers):
                         cv2.circle(self.imc, self.centers[-1], 7, (255, 255, 255), -1)
 
@@ -316,7 +312,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                                self.result.shape[0],
                                QImage.Format_BGR888)
             self.CV.setPixmap(QPixmap.fromImage(showImage))
-
 
     def porcess_off(self):
         pass
@@ -399,7 +394,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     parse_str += "%s"%self.parse[param]
         parse_str = " ".join(self.parse.values())
         self.params.setText(parse_str)
-        self.opt["source"] =  self.parse["source"].split(" ")[-1]
+        self.opt["source"] = self.parse["source"].split(" ")[-1]
         self.opt["imgsz"] = eval(self.parse["imgsz"].split(" ")[-1])
         self.opt["weights"] = self.parse["weights"].split(" ")[-1]
         self.opt["data"] = self.parse["data"].split(" ")[-1]

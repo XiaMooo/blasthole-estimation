@@ -11,7 +11,7 @@ scipy>=1.4.1
 torch>=1.7.0
 torchvision>=0.8.1
 tqdm>=4.41.0
-pyside6
+pyside6~=6.2.3
 qt-material
 
 # Logging -------------------------------------
@@ -36,4 +36,5 @@ seaborn>=0.11.0
 # Cython  # for pycocotools https://github.com/cocodataset/cocoapi/issues/172
 # pycocotools>=2.0  # COCO mAP
 # roboflow
-thop  # FLOPs computation
+thop~=0.0.31.post2005241907
+pyrealsense2~=2.50.0.3812
