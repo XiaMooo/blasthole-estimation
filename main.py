@@ -9,7 +9,7 @@ sys.path.append("./yolov5")
 
 from ui.style import *
 from ui.ui import *
-
+from programme.programme import *
 from qt_material import apply_stylesheet
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     # h_min = min(self.ViewSize[0] / 16 * 9, self.ViewSize[1])
                     # self.ViewSize = [int(h_min / 9 * 16), int(h_min)]
                     # print("Resize:", self.ViewSize)
-                    self.timer_video.start(30)
+                    self.timer_video.start(1)
 
             if not self.buttonCamera.isChecked() and \
                     not self.buttonCapture.isChecked() and \
@@ -171,15 +171,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if len(det):
                     det[:, :4] = scale_coords(img.shape[2:], det[:, :4], imageSourceShape).round()
 
-                    self.centers = []
+                    self.center = []
                     for *xyxy, conf, cls in reversed(det):
                         cx = int((xyxy[0] + xyxy[2]) / 2)
                         cy = int((xyxy[1] + xyxy[3]) / 2)
                         self.centers.append((cx, cy))
                         label = self.names[int(cls)] if self.opt["hide_conf"] else f"{self.names[int(cls)]} {conf:.2f}"
                         annotator.box_label(xyxy, label, color=colors(int(cls) + 3, True))
-
-                    self.centers.sort()
 
             self.result = self.imc
             # print(self.centers)
@@ -265,12 +263,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         annotator.box_label(xyxy, label, color=colors(int(cls) + 3, True))
 
                     # Add By XiaMoo
-                    self.centers.sort()
+                    # self.centers.sort()
+                    queue = programme0(self.centers)
                     for j in range(len(self.centers) - 1 if len(self.centers) > 0 else 0):
-                        cv2.circle(self.imc, self.centers[j], 7, (255, 255, 255), -1)
-                        cv2.line(self.imc, self.centers[j], self.centers[j + 1], (255, 255, 0), 3)
+                        cv2.circle(self.imc, self.centers[queue[j]], 7, (255, 255, 255), -1)
+                        cv2.line(self.imc, self.centers[queue[j]], self.centers[queue[j+1]], (255, 255, 0), 3)
                     if len(self.centers):
-                        cv2.circle(self.imc, self.centers[-1], 7, (255, 255, 255), -1)
+                        cv2.circle(self.imc, self.centers[queue[-1]], 7, (255, 255, 255), -1)
 
             self.result = self.imc
             print(self.centers)
