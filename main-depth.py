@@ -331,7 +331,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ptFileName, self.ptFileType = QFileDialog.getOpenFileName(self,
                                                                        "选择文件",
                                                                        "../",
-                                                                       "(*.pt)")
+                                                                       "(*.pt)",
+                                                                       None,
+                                                                       QFileDialog.DontUseNativeDialog)
         if not self.ptFileName:
             self.modelLabel.setText(self.lastPtFile.split("/")[-1])
             self.parse["weights"] = "--weights " + self.lastPtFile
@@ -347,7 +349,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.yamlFileName, self.yamlFileType = QFileDialog.getOpenFileName(self,
                                                                            "选择文件",
                                                                            "../",
-                                                                           "(*.yaml)")
+                                                                           "(*.yaml)",
+                                                                           None,
+                                                                           QFileDialog.DontUseNativeDialog)
         if not self.yamlFileName:
             self.Yaml.setText(self.lastYamlFile.split("/")[-1])
             self.parse["data"] = "--data " + self.lastYamlFile
@@ -413,10 +417,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    apply_stylesheet(app, theme + '.xml',
-                     invert_secondary=(
-                             'light' in theme and 'dark' not in theme),
-                     extra=extra)
+    # apply_stylesheet(app, theme + '.xml',
+    #                  invert_secondary=(
+    #                          'light' in theme and 'dark' not in theme),
+    #                  extra=extra)
     w = MainWindow()
     w.show()
     sys.exit(app.exec())
