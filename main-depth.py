@@ -11,7 +11,8 @@ import pyrealsense2 as rs
 
 from ui.style import *
 from ui.ui import *
-
+from programme.programme import *
+from programme.space_map import *
 from qt_material import apply_stylesheet
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
@@ -34,6 +35,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.imd = None
         self.imd0 = None
         self.centers = []
+        self.positions = []
         self.timer_video = QTimer()
         self.yamlFileType = None
         self.ptFileType = None
@@ -204,7 +206,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         label = self.names[int(cls)] if self.opt["hide_conf"] else f"{self.names[int(cls)]} {conf:.2f}"
 
                         annotator.box_label(xyxy, label, color=colors(int(cls) + 3, True))
-                        annotator2.box_label(xyxy, str((cx, cy, distance)), color=colors(int(cls) + 3, True))
+                        annotator2.box_label(xyxy, str(mapping((cx, cy, distance), self.imd.shape)), color=colors(int(cls) + 3, True))
+                        # annotator2.box_label(xyxy, str((cx, cy, distance)), color=colors(int(cls) + 3, True))
 
                     self.centers.sort()
 
