@@ -158,7 +158,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def show_frame(self):
         flag, img = self.cap.read()
         if self.filter.isChecked():
-            img = cv2.filter2D(img, -1, kernel_outline)
+            img = cv2.filter2D(img, -1, kernel_sharpen_1)
+            img = img.astype(np.uint8)
         if img is not None:
             # 记录原尺寸
             imageSourceShape = img.shape
@@ -293,7 +294,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def choose_model(self):
         self.ptFileName, self.ptFileType = QFileDialog.getOpenFileName(self,
                                                                        "选择文件",
-                                                                       "../",
+                                                                       "./",
                                                                        "(*.pt)",
                                                                        None,
                                                                        QFileDialog.DontUseNativeDialog)
@@ -311,7 +312,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def choose_yaml(self):
         self.yamlFileName, self.yamlFileType = QFileDialog.getOpenFileName(self,
                                                                            "选择文件",
-                                                                           "../",
+                                                                           "./",
                                                                            "(*.yaml)",
                                                                            None,
                                                                            QFileDialog.DontUseNativeDialog)
